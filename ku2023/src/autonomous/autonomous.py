@@ -110,7 +110,7 @@ class Autonomous:
         self.enu_pos_sub = rospy.Subscriber("/enu_position", Point, self.boat_position_callback, queue_size=1)
         self.obstacle_sub = rospy.Subscriber("/obstacles", ObstacleList, self.obstacle_callback, queue_size=1)
         
-        #####edit
+        #####edit#
         self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.IMU_callback, queue_size=1)
         #####
 
