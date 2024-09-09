@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+
+<launch>
+  <param name="m_bSingle_TF_option" type="bool" value="true" /> 
+  <node pkg="iahrs_driver" type="iahrs_driver" name="iahrs_driver" output="screen"> 
+       <param name="port" value="/dev/ttyIMU" />
+  </node>
+</launch>
+
+<!-- <launch>
+  <param name="m_bSingle_TF_option" type="bool" value="true" />
+	<node pkg="iahrs_driver" type="iahrs_driver" name="iahrs_driver">
+		<param name="port" value="/dev/ttyIMU" />
+		<param name="baud_rate" value="115200" />
+	</node>
+</launch> -->
+

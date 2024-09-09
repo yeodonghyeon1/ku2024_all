@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <node  pkg="ku2023" type="fake_gps.py" name="fake_gps"/>
+</launch>

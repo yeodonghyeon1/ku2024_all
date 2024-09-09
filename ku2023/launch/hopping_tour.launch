@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+
+	<!--Velodyne LiDAR-->
+	<!-- load driver nodelet into it -->
+
+	<include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch"></include>
+
+	<!--GPS-->
+	<!-- <include file="$(find ntrip_ros)/launch/ntrip_ros.launch"></include> -->
+	<include file="$(find ntrip_ros)/launch/fake_gps.launch"></include>
+
+	<include file="$(find iahrs_driver)/launch/iahrs_driver.launch"></include>
+
+	<!--IMU-->
+	<!-- <node pkg="iahrs_driver" type="iahrs_driver" name="iahrs_driver">
+		<param name="port" value="/dev/ttyIMU" />
+		<param name="baud_rate" value="115200" />
+	</node> -->
+
+	<!-- Nodes -->
+	<!-- <node pkg="ku2023"  type="heading_calculator.py" name="headingCalculator" respawn="true"/> -->
+	<node pkg="ku2023"  type="heading_calculator_iahrs.py" name="headingCalculator" respawn="true" />
+	<node pkg="ku2023"  type="gnss_converter.py" name="gnssConverter" respawn="true"/>
+	<!--<node pkg="ku2023" type="serial_com.py" name="serial_can" respawn="true"/> -->
+	<node pkg="ku2023" type="serial_node.py" name="ARDUINO" args="/dev/ttyARDUINO" respawn="true"/> 
+	<!-- 2022 version -->
+	<node pkg="ku2023" type="hopping_tour.py" name="hoppingTour" output="screen"/>
+	<!-- 2021 version -->
+
+	<!-- Visualization -->
+	<!-- <node name="rqt" pkg="rqt_graph" type="rqt_graph"/> -->
+	<!-- 2022 version -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find ku2023)/rviz/rviz_conf_auto.rviz" />
+	<!-- 2021 version -->
+	<!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find ku2023)/rviz/rviz_conf_2021hop.rviz" /> -->
+
+	<!-- Record -->
+	<arg name="do_record" default="false" />
+	<arg name="filename" default="8_1_hopping.bag" />
+
+
+	<node pkg="rosbag" type="record" name="rosbag_record" required="true" if="$(arg do_record)" args="record -a -O media/jetson/data/rosbag/$(arg filename)"  />
+
+	
+	<rosparam command="load" file="$(find ku2023)/params/lidar_params.yaml"/>
+	<rosparam command="load" file="$(find ku2023)/params/hopping_params.yaml"/>
+	<rosparam command="load" file="$(find ku2023)/params/coordinates.yaml"/>
+	
+</launch>

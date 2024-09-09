@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+	<!-- Recording -->
+	<node pkg="rosbag" type="play" name="rosbag_play" required="true" args="$(find ku2023)/data/rosbag/final-220817-181154-hopping-17.bag -l --topics /imu/data /imu/mag /ublox_gps/fix"/>
+
+	<!-- Nodes -->
+	<node pkg="ku2023"  type="heading_calculator.py" name="headingCalculator" respawn="true"/>
+	<node pkg="ku2023"  type="gnss_converter.py" name="gnssConverter" respawn="true"/>
+	<!-- <node pkg="ku2023" type="hopping_tour.py" name="hopping" respawn="true" output="screen"/> -->
+	<node pkg="ku2023" type="hopping_old.py" name="hopping" respawn="true" output="screen"/>
+
+	<!-- Visualization -->
+	<!-- <node name="rqt" pkg="rqt_graph" type="rqt_graph"/> -->
+	<!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find ku2023)/rviz/rviz_conf_auto.rviz" /> -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find ku2023)/rviz/rviz_conf_2021hop.rviz" />
+	
+	<!-- Parameters -->
+	<rosparam command="load" file="$(find ku2023)/params/lidar_params.yaml"/>
+	<rosparam command="load" file="$(find ku2023)/params/hopping_params.yaml"/>
+	<rosparam command="load" file="$(find ku2023)/params/coordinates.yaml"/>
+	
+</launch>

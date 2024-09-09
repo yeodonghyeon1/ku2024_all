@@ -1,0 +1,26 @@
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", SYMLINK+="ttyGPS"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="0892", ATTRS{serial}=="0001", SYMLINK+="ttyCAMERA"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", ATTRS{idProduct}=="0042", ATTRS{serial}=="85735313632351A05112", SYMLINK+="ttyARDUINO"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="34fb725f39f2aa43983443406d85705f", SYMLINK+="ttyLIDAR"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="000001010000", SYMLINK+="ttyIMU"
+
+
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="0001", SYMLINK+="ttyIMU"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", SYMLINK+="ttyGPS"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", ATTRS{idProduct}=="0044", ATTRS{serial}=="85735313632351A05112", SYMLINK+="ttyARDUINO"
+
+
+
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", SYMLINK+="ttyGPS"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="0892", SYMLINK+="ttyCAMERA"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", ATTRS{idProduct}=="0042", ATTRS{serial}=="55130303335351D09002", SYMLINK+="ttyARDUINO"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="0001", SYMLINK+="ttyLIDAR"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}=="DM03L0C6",MODE="0666", GROUP="dialout",SYMLINK+="ttyIMU"
+
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4",ATTRS{idProduct}=="ea60",MODE:="0666", ATTRS{serial}=="0001", SYMLINK+="ttyIMU"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60",MODE:="0666", ATTRS{serial}=="0001", SYMLINK+="ttyLIDAR"
+
+
+
