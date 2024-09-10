@@ -295,6 +295,13 @@ class Docking:
         if self.state == 0: #도킹 포인트 지점으로 이동
             # 변경지점 도착 여부 판단1111
             change_state = self.calc_distance(self.waypoints[0])
+        elif self.state == 3:
+            if self.mark_check_cnt >= self.target_detect_time:
+                change_state = True
+                self.mark_check_cnt = 0
+                self.detected_cnt = 0
+            else:
+                change_state = False
         elif self.state == 4: # 도형 쪽으로 헤딩값 수정
             change_state = self.check_heading()
         elif self.state == 5:
@@ -588,6 +595,30 @@ def main():
             )
             # 선속 결정
             u_thruster = True
+        elif docking.state == 3:
+            docking.mark_check_cnt += 1  # 탐색 횟수 1회 증가
+            detected = docking.check_target()  # 타겟이 탐지 되었는가?
+
+            if detected:
+                docking.detected_cnt += 1  # 타겟 탐지 횟수 1회 증가
+
+            # 지정된 횟수만큼 탐색 실시해봄
+            if docking.mark_check_cnt >= docking.target_detect_time:
+                # 타겟 마크가 충분히 많이 검출됨
+                if docking.detected_cnt >= docking.target_detect_cnt:
+                    docking.target = docking.check_target(return_target=True)  # 타겟 정보
+                    docking.target_found = True  # 타겟 발견 플래그
+                else:
+                    docking.target = []  # 타겟 정보 초기화(못 찾음)
+                    docking.target_found = False  # 타겟 미발견 플래그
+                    rospy.sleep(0.2)
+                    docking.thrusterL_pub.publish(1550)
+                    docking.thrusterR_pub.publish(1550)
+                    rospy.sleep(1)
+
+            # 아직 충분히 탐색하기 전
+            else:
+                docking.target_found = False  # 타겟 미발견 플래그
 
         # 헤딩 돌리기: 우선 일정 시간동안 정지한 후 헤딩 회전
         elif docking.state == 4:

@@ -41,7 +41,7 @@ from ku2023.msg import ObstacleList
 from utils.tools import *
 import copy
 from utils.PID import PID
-
+from dock.docking_fix import *
 
 class Autonomous:
     def __init__(self):
@@ -251,7 +251,6 @@ def shutdown():
     sys.exit(0)
 
 
-
 def main():
     global auto
     rospy.init_node("autonomous", anonymous=False)
@@ -282,131 +281,135 @@ def main():
             if arrived:  # current goal in and change goal
                auto.set_next_goal() 
             else:
-                auto.trajectory.append([auto.boat_x, auto.boat_y])  # 이동 경로 추가
-                ###move and add the next goal
-                # 현재 heading에서 목표로 갈 때 돌려야 할 각도 업데이트
-                auto.psi_goal = math.degrees(math.atan2(auto.goal_y - auto.boat_y, auto.goal_x - auto.boat_x)) - auto.psi
-                print("first", auto.psi_goal)
-                auto.psi_goal = rearrange_angle(auto.psi_goal)
-                print("second", auto.psi_goal)
-
-                if auto.waypoint_idx == 1 and imu_fix:
-                    auto.imu_fix = auto.psi_goal
-                    imu_fix= False
-
-                # 장애물 탐지. 범위 내에 있는 장애물을 필터링하고, 장애물이 있는 각도 리스트를 만듦
-                auto.inrange_obstacles, auto.danger_angles = oa.ob_filtering(
-                    obstacles=auto.obstacles,
-                    dist_to_goal=auto.distance_to_goal,
-                    angle_to_goal=auto.psi_goal,
-                    span_angle=auto.span_angle,
-                    angle_range=auto.ob_angle_range,
-                    distance_range=auto.ob_dist_range,
-                )
-
-                # 목표각과 현 헤딩 사이 상대적 각도 계산. 선박고정좌표계로 '가야 할 각도'에 해당
-                error_angle = oa.calc_desire_angle(
-                    danger_angles=auto.danger_angles,
-                    angle_to_goal=auto.psi_goal,
-                    angle_range=auto.ob_angle_range,
-                )
-
-                # 월드좌표계로 '가야 할 각도'를 계산함
-                auto.psi_desire = rearrange_angle(auto.psi + error_angle)
-
-                # degree 단위를 servo moter 단위로 변경
-                u_servo = control.degree_to_servo(
-                    error_angle=error_angle,
-                    angle_alpha=auto.angle_alpha,
-                    angle_range=auto.rotate_angle_range,
-                    servo_range=auto.servo_range,
-                )
-                # u_servo = moving_avg_filter(auto.filter_queue, auto.filter_queue_size, u_servo)
-                angle_PID = PID()
-                distance_PID = PID()
-
-                PID_angle = angle_PID.update(error_angle)
-                PID_distance = distance_PID.update(auto.distance_to_goal)
-                #-----------------edit----------------------------------------------------#
-
-                thruster_speed_L=1560
-                thruster_speed_R=1560
-                limit_go_speed = 1750
-                limit_back_speed = 1350
-                PID_distance_value = 8
-
-                #-------------------------------------------------------------------------#
-
-                PID_distance = abs(math.log(pow(PID_distance, PID_distance_value), 2))
-                if error_angle < 0:
-                    thruster_speed_L = thruster_speed_L + abs(PID_angle)
-                    thruster_speed_R = thruster_speed_R - abs(PID_angle)
+                if auto.waypoint_idx == 2:
+                    docking_part()
+                    auto.set_next_goal() 
                 else:
-                    thruster_speed_L = thruster_speed_L - abs(PID_angle)
-                    thruster_speed_R = thruster_speed_R + abs(PID_angle)
+                    auto.trajectory.append([auto.boat_x, auto.boat_y])  # 이동 경로 추가
+                    ###move and add the next goal
+                    # 현재 heading에서 목표로 갈 때 돌려야 할 각도 업데이트
+                    auto.psi_goal = math.degrees(math.atan2(auto.goal_y - auto.boat_y, auto.goal_x - auto.boat_x)) - auto.psi
+                    print("first", auto.psi_goal)
+                    auto.psi_goal = rearrange_angle(auto.psi_goal)
+                    print("second", auto.psi_goal)
 
-                thruster_speed_L = thruster_speed_L + PID_distance
-                thruster_speed_R = thruster_speed_R + PID_distance
+                    if auto.waypoint_idx == 1 and imu_fix:
+                        auto.imu_fix = auto.psi_goal
+                        imu_fix= False
+
+                    # 장애물 탐지. 범위 내에 있는 장애물을 필터링하고, 장애물이 있는 각도 리스트를 만듦
+                    auto.inrange_obstacles, auto.danger_angles = oa.ob_filtering(
+                        obstacles=auto.obstacles,
+                        dist_to_goal=auto.distance_to_goal,
+                        angle_to_goal=auto.psi_goal,
+                        span_angle=auto.span_angle,
+                        angle_range=auto.ob_angle_range,
+                        distance_range=auto.ob_dist_range,
+                    )
+
+                    # 목표각과 현 헤딩 사이 상대적 각도 계산. 선박고정좌표계로 '가야 할 각도'에 해당
+                    error_angle = oa.calc_desire_angle(
+                        danger_angles=auto.danger_angles,
+                        angle_to_goal=auto.psi_goal,
+                        angle_range=auto.ob_angle_range,
+                    )
+
+                    # 월드좌표계로 '가야 할 각도'를 계산함
+                    auto.psi_desire = rearrange_angle(auto.psi + error_angle)
+
+                    # degree 단위를 servo moter 단위로 변경
+                    u_servo = control.degree_to_servo(
+                        error_angle=error_angle,
+                        angle_alpha=auto.angle_alpha,
+                        angle_range=auto.rotate_angle_range,
+                        servo_range=auto.servo_range,
+                    )
+                    # u_servo = moving_avg_filter(auto.filter_queue, auto.filter_queue_size, u_servo)
+                    angle_PID = PID()
+                    distance_PID = PID()
+
+                    PID_angle = angle_PID.update(error_angle)
+                    PID_distance = distance_PID.update(auto.distance_to_goal)
+                    #-----------------edit----------------------------------------------------#
+
+                    thruster_speed_L=1560
+                    thruster_speed_R=1560
+                    limit_go_speed = 1750
+                    limit_back_speed = 1350
+                    PID_distance_value = 8
+
+                    #-------------------------------------------------------------------------#
+
+                    PID_distance = abs(math.log(pow(PID_distance, PID_distance_value), 2))
+                    if error_angle < 0:
+                        thruster_speed_L = thruster_speed_L + abs(PID_angle)
+                        thruster_speed_R = thruster_speed_R - abs(PID_angle)
+                    else:
+                        thruster_speed_L = thruster_speed_L - abs(PID_angle)
+                        thruster_speed_R = thruster_speed_R + abs(PID_angle)
+
+                    thruster_speed_L = thruster_speed_L + PID_distance
+                    thruster_speed_R = thruster_speed_R + PID_distance
 
 
-                # if error_angle > -1.0 and error_angle < 0.0: #go light 
-                #     thruster_speed_L= 1560
-                #     thruster_speed_R= 1440
-                # elif error_angle<1.0 and error_angle>0.0: #go left
-                #     thruster_speed_L= 1440
-                #     thruster_speed_R= 1560
+                    # if error_angle > -1.0 and error_angle < 0.0: #go light 
+                    #     thruster_speed_L= 1560
+                    #     thruster_speed_R= 1440
+                    # elif error_angle<1.0 and error_angle>0.0: #go left
+                    #     thruster_speed_L= 1440
+                    #     thruster_speed_R= 1560
 
-                # if error_angle > -1.0 and error_angle < -2: #go light 
-                #     thruster_speed_L= 1580
-                #     thruster_speed_R= 1420
-                # elif error_angle<1.0 and error_angle>2: #go left
-                #     thruster_speed_L= 1420
-                #     thruster_speed_R= 1580
+                    # if error_angle > -1.0 and error_angle < -2: #go light 
+                    #     thruster_speed_L= 1580
+                    #     thruster_speed_R= 1420
+                    # elif error_angle<1.0 and error_angle>2: #go left
+                    #     thruster_speed_L= 1420
+                    #     thruster_speed_R= 1580
 
-                # elif error_angle > -2.0 and error_angle < -3.0: #go light 
-                #     thruster_speed_L= 1600
-                #     thruster_speed_R= 1410
-                # elif error_angle<2.0 and error_angle>3.0: #go left
-                #     thruster_speed_L= 1410
-                #     thruster_speed_R= 1600
+                    # elif error_angle > -2.0 and error_angle < -3.0: #go light 
+                    #     thruster_speed_L= 1600
+                    #     thruster_speed_R= 1410
+                    # elif error_angle<2.0 and error_angle>3.0: #go left
+                    #     thruster_speed_L= 1410
+                    #     thruster_speed_R= 1600
 
-                # elif error_angle < -4.0: #go left 
-                #     thruster_speed_L= 1650
-                #     thruster_speed_R= 1400
-                # elif error_angle>4.0: #go left
-                #     thruster_speed_L= 1400
-                #     thruster_speed_R= 1650
+                    # elif error_angle < -4.0: #go left 
+                    #     thruster_speed_L= 1650
+                    #     thruster_speed_R= 1400
+                    # elif error_angle>4.0: #go left
+                    #     thruster_speed_L= 1400
+                    #     thruster_speed_R= 1650
 
-            #----------------------------------------------------------------------------
+                    #----------------------------------------------------------------------------
 
-                # 제어명령
-                if thruster_speed_L > limit_go_speed:
-                    thruster_speed_L = limit_go_speed
-                if thruster_speed_R > limit_go_speed:
-                    thruster_speed_R = limit_go_speed
-                if thruster_speed_L < limit_back_speed:
-                    thruster_speed_L = limit_back_speed
-                if thruster_speed_R < limit_back_speed:
-                    thruster_speed_R = limit_back_speed
+                    # 제어명령
+                    if thruster_speed_L > limit_go_speed:
+                        thruster_speed_L = limit_go_speed
+                    if thruster_speed_R > limit_go_speed:
+                        thruster_speed_R = limit_go_speed
+                    if thruster_speed_L < limit_back_speed:
+                        thruster_speed_L = limit_back_speed
+                    if thruster_speed_R < limit_back_speed:
+                        thruster_speed_R = limit_back_speed
 
-                print("PID_angle", PID_angle)
-                print("PID_distance", PID_distance)
+                    print("PID_angle", PID_angle)
+                    print("PID_distance", PID_distance)
 
-                print("thruster_speed_L", thruster_speed_L)
-                print("thruster_speed_R", thruster_speed_R)
+                    print("thruster_speed_L", thruster_speed_L)
+                    print("thruster_speed_R", thruster_speed_R)
 
-                auto.thrusterL_pub.publish(thruster_speed_L)
-                auto.thrusterR_pub.publish(thruster_speed_R)
+                    auto.thrusterL_pub.publish(thruster_speed_L)
+                    auto.thrusterR_pub.publish(thruster_speed_R)
 
-                
+                    
 
-                # 현 상태 출력 및 시각화
-                print("")
-                print("{:<9} : {:<6.3f}".format("Run time", rospy.get_time() - start_time))  # 작동 시간
-                auto.print_status(error_angle, u_servo)
-                auto.imu_fix_pub.publish(auto.imu_fix)
-                all_markers = av.visualize(auto)
-                auto.visual_rviz_pub.publish(all_markers)
+                    # 현 상태 출력 및 시각화
+                    print("")
+                    print("{:<9} : {:<6.3f}".format("Run time", rospy.get_time() - start_time))  # 작동 시간
+                    auto.print_status(error_angle, u_servo)
+                    auto.imu_fix_pub.publish(auto.imu_fix)
+                    all_markers = av.visualize(auto)
+                    auto.visual_rviz_pub.publish(all_markers)
             rate.sleep()
     rospy.on_shutdown(shutdown)
     
