@@ -16,8 +16,8 @@
 	<include file="$(find ku2023)/launch/p_to_laser.launch"></include>
 
 	<!--GPS-->
-	<!-- <include file="$(find ku2023)/launch/ntrip_ros.launch"></include>  -->
-	<include file="$(find ku2023)/launch/fake_gps.launch"></include>
+	<include file="$(find ku2023)/launch/ntrip_ros.launch"></include> 
+	<!-- <include file="$(find ku2023)/launch/fake_gps.launch"></include> -->
 	<include file="$(find ku2023)/launch/etk_localization.launch"></include>
 
 	<!--IMU-->
@@ -37,7 +37,7 @@
 	<!-- <node name="rqt" pkg="rqt_graph" type="rqt_graph"/> -->
 	
 	<!-- Record -->
-	<!--<node pkg="rosbag" type="record" name="rosbag_record" required="true"  args="-a -o /media/jetson/data/rosbag/"  /> -->
+	<node pkg="rosbag" type="record" name="rosbag_record" required="true"  args="-a -o /media/jetson/data/rosbag/"  />
 
 	<!-- Parameters -->
 	<rosparam command="load" file="$(find ku2023)/params/lidar_params.yaml"/>

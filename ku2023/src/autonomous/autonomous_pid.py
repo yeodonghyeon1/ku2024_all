@@ -280,15 +280,24 @@ def main():
             # auto.trajectory.append([auto.boat_x, auto.boat_y])         
             arrived = auto.arrival_check()  # 현 시점에서 목표까지 남은 거리 재계산
             if arrived:  # current goal in and change goal
-               auto.set_next_goal() 
+                auto.thrusterL_pub.publish(1450)
+                auto.thrusterR_pub.publish(1450)
+                auto.thrusterL_pub.publish(1450)
+                auto.thrusterR_pub.publish(1450)
+                rospy.sleep(1.5)
+                auto.thrusterL_pub.publish(1500)
+                auto.thrusterR_pub.publish(1500)
+                auto.thrusterL_pub.publish(1500)
+                auto.thrusterR_pub.publish(1500)
+                rospy.sleep(2.0)
+                auto.set_next_goal()
             else:
                 auto.trajectory.append([auto.boat_x, auto.boat_y])  # 이동 경로 추가
                 ###move and add the next goal
                 # 현재 heading에서 목표로 갈 때 돌려야 할 각도 업데이트
                 auto.psi_goal = math.degrees(math.atan2(auto.goal_y - auto.boat_y, auto.goal_x - auto.boat_x)) - auto.psi
-                print("first", auto.psi_goal)
                 auto.psi_goal = rearrange_angle(auto.psi_goal)
-                print("second", auto.psi_goal)
+
 
                 if auto.waypoint_idx == 1 and imu_fix:
                     auto.imu_fix = auto.psi_goal
@@ -337,7 +346,8 @@ def main():
 
                 #-------------------------------------------------------------------------#
 
-                PID_distance = abs(math.log(pow(PID_distance, PID_distance_value), 2))
+                PID_distance = int(abs(math.log(pow(PID_distance, PID_distance_value), 2)))
+                PID_angle = int(PID_angle * 3)
                 if error_angle < 0:
                     thruster_speed_L = thruster_speed_L + abs(PID_angle)
                     thruster_speed_R = thruster_speed_R - abs(PID_angle)
@@ -345,39 +355,8 @@ def main():
                     thruster_speed_L = thruster_speed_L - abs(PID_angle)
                     thruster_speed_R = thruster_speed_R + abs(PID_angle)
 
-                thruster_speed_L = thruster_speed_L + PID_distance
-                thruster_speed_R = thruster_speed_R + PID_distance
-
-
-                # if error_angle > -1.0 and error_angle < 0.0: #go light 
-                #     thruster_speed_L= 1560
-                #     thruster_speed_R= 1440
-                # elif error_angle<1.0 and error_angle>0.0: #go left
-                #     thruster_speed_L= 1440
-                #     thruster_speed_R= 1560
-
-                # if error_angle > -1.0 and error_angle < -2: #go light 
-                #     thruster_speed_L= 1580
-                #     thruster_speed_R= 1420
-                # elif error_angle<1.0 and error_angle>2: #go left
-                #     thruster_speed_L= 1420
-                #     thruster_speed_R= 1580
-
-                # elif error_angle > -2.0 and error_angle < -3.0: #go light 
-                #     thruster_speed_L= 1600
-                #     thruster_speed_R= 1410
-                # elif error_angle<2.0 and error_angle>3.0: #go left
-                #     thruster_speed_L= 1410
-                #     thruster_speed_R= 1600
-
-                # elif error_angle < -4.0: #go left 
-                #     thruster_speed_L= 1650
-                #     thruster_speed_R= 1400
-                # elif error_angle>4.0: #go left
-                #     thruster_speed_L= 1400
-                #     thruster_speed_R= 1650
-
-            #----------------------------------------------------------------------------
+               # thruster_speed_L = thruster_speed_L + PID_distance
+               # thruster_speed_R = thruster_speed_R + PID_distance
 
                 # 제어명령
                 if thruster_speed_L > limit_go_speed:
@@ -392,11 +371,11 @@ def main():
                 print("PID_angle", PID_angle)
                 print("PID_distance", PID_distance)
 
-                print("thruster_speed_L", thruster_speed_L)
-                print("thruster_speed_R", thruster_speed_R)
+                print("thruster_speed_R", int(thruster_speed_L))
+                print("thruster_speed_L", int(thruster_speed_R))
 
-                auto.thrusterL_pub.publish(thruster_speed_L)
-                auto.thrusterR_pub.publish(thruster_speed_R)
+                auto.thrusterL_pub.publish(int(thruster_speed_L))
+                auto.thrusterR_pub.publish(int(thruster_speed_R))
 
                 
 

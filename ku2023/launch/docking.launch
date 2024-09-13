@@ -10,7 +10,7 @@
         <param name="io_method" value="mmap" />
         <param name="image_width" value="640" />
         <param name="image_height" value="480" />
-        <param name="exposure" value="3" />
+        <param name="exposure" value="30" />
         <param name="contrast" value="0" /> 	 		
         <param name="saturation" value="100" />
     </node>
@@ -38,21 +38,26 @@
 		<param name="scan_mode"           type="string" value="Stability"/>
 	</node> -->
 	<include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch"></include>
+	<include file="$(find ku2023)/launch/p_to_laser.launch"></include>
 
 	<!--GPS-->
-	<include file="$(find ntrip_ros)/launch/ntrip_ros.launch"></include>
-	<!-- <include file="$(find ntrip_ros)/launch/fake_gps.launch"></include> -->
+	<include file="$(find ku2023)/launch/ntrip_ros.launch"></include>
+	<!-- <include file="$(find ku2023)/launch/fake_gps.launch"></include> -->
+	<include file="$(find ku2023)/launch/etk_localization.launch"></include>
+
+	
 	<!--IMU-->
-	<node pkg="iahrs_driver" type="iahrs_driver" name="iahrs_driver">
+	<include file="$(find ku2023)/launch/iahrs_driver.launch"></include>
+	<!-- <node pkg="iahrs_driver" type="iahrs_driver" name="iahrs_driver">
 		<param name="port" value="/dev/ttyIMU" />
 		<param name="baud_rate" value="115200" />
-	</node>
+	</node> -->
 
 	<!-- Nodes -->
-	<node pkg="ku2023"  type="heading_calculator.py" name="headingCalculator" respawn="true" />
-	<node pkg="ku2023"  type="gnss_converter.py" name="gnssConverter" re	spawn="true"/>
+	<node pkg="ku2023"  type="heading_calculator_iahrs.py" name="headingCalculator" respawn="true" />
+	<node pkg="ku2023"  type="gnss_converter.py" name="gnssConverter" respawn="true"/>
 	<node pkg="ku2023" type="lidar_converter.py" name="lidarConverter" respawn="true" />
-	<node pkg="ku2023" type="docking_fix.py" name="docking" output="screen"/>
+	<node pkg="ku2023" type="docking_fix_2024.py" name="docking" output="screen"/>
 	<node pkg="ku2023" type="serial_node.py" name="ARDUINO" args="/dev/ttyARDUINO" respawn="true"/>
 
 	<!-- Visualization -->
@@ -60,7 +65,7 @@
 	<!-- <node name="rqt" pkg="rqt_graph" type="rqt_graph"/> -->
 
 	<!-- Record -->
-	<node pkg="rosbag" type="record" name="rosbag_record" required="true"  args="-a -o /media/jetson/data/rosbag/"  />
+	<!-- <node pkg="rosbag" type="record" name="rosbag_record" required="true"  args="-a -o /media/jetson/data/rosbag/"  /> -->
 
 	<!-- Parameters -->
 	<rosparam command="load" file="$(find ku2023)/params/lidar_params.yaml"/>

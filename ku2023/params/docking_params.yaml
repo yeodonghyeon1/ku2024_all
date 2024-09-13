@@ -44,14 +44,13 @@ station_dir: -10
 # 표지 색 범위
 color_range : {
   red: {
-    color1_lower: 153,
-    color1_upper: 232,
-    color2_lower: 0,
-    color2_upper: 255,
-    color3_lower: 0,
-    color3_upper: 255
+    color1_lower: 88,
+    color1_upper: 108,
+    color2_lower: 92,
+    color2_upper: 112,
+    color3_lower: 178,
+    color3_upper: 188
   },
-
   red_2: {
     color1_lower: 134,
     color1_upper: 232,
@@ -60,7 +59,6 @@ color_range : {
     color3_lower: 132,
     color3_upper: 255
   },
-
   green: {
     color1_lower: 40, 
     color1_upper: 100,
@@ -70,39 +68,13 @@ color_range : {
     color3_upper: 250,
   },
   blue: {
-    color1_lower: 107,
-    color1_upper: 180,
-    color2_lower: 136,
-    color2_upper: 255,
-    color3_lower: 0,
-    color3_upper: 255
+    color1_lower: 181,
+    color1_upper: 201,
+    color2_lower: 105,
+    color2_upper: 125,
+    color3_lower: 106,
+    color3_upper: 126
   },
-  Light_sky_blue: {
-    color1_lower: 135,
-    color1_upper: 255,
-    color2_lower: 206,
-    color2_upper: 255,
-    color3_lower: 235,
-    color3_upper: 255
-   },
-    pastel_blue: {
-    color1_lower: 173,
-    color1_upper: 255,
-    color2_lower: 216,
-    color2_upper: 255,
-    color3_lower: 230,
-    color3_upper: 255
-   },
-    light_cyan: {
-    color1_lower: 224,
-    color1_upper: 255,
-    color2_lower: 255,
-    color2_upper: 255,
-    color3_lower: 235,
-    color3_upper: 255
-   },
-  
-
   black: {
     color1_lower: 0,
     color1_upper: 0,
@@ -137,7 +109,7 @@ color_range : {
 target_shape: 8
 
 # 목표 색깔 (red, green, blue, black, black2, orange)
-target_color: red
+target_color: blue
 
 # 인식 최소 크기 (최소 이만큼은 되어야 인지 시작, 이보다 작으면 무시)
 mark_detect_area: 200

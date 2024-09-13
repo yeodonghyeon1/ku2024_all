@@ -188,7 +188,7 @@ class Docking:
         self.thruster_speed_L= 1500
         self.thruster_speed_R= 1500
         # current status
-        self.state = 4
+        self.state = 0
         # 0: 장애물 회피
         # 1: 스테이션1로 이동 중
         # 2: 스테이션2로 이동 중
@@ -200,7 +200,7 @@ class Docking:
         self.target = []  # [area, center_col(pixel)]. 딕셔너리로 선언하는 쪽이 더 쉬울 듯
         self.target_found = False
         self.next_to_visit = 4  # 다음에 방문해야 할 스테이션 번호. state 시작을 1로할거면 1로
-
+        self.imu_fix = 0
         # controller
         cv2.namedWindow("controller")
         # cv2.createTrackbar("color1 min", "controller", self.color_range[0][0], 180, lambda x: x)
@@ -220,8 +220,9 @@ class Docking:
         # )
 
     def heading_callback(self, msg):
-        self.psi = msg.data  # [degree]
-
+        # self.psi = msg.data  # [degree]
+        self.psi = -(msg.data - self.imu_fix)
+        
     def boat_position_callback(self, msg):
         self.boat_x = msg.x + self.diff[0]
         self.boat_y = msg.y + self.diff[1]
@@ -234,11 +235,15 @@ class Docking:
         img = self.bridge.imgmsg_to_cv2(msg, "bgr8")
         if img.size == (640 * 480 * 3):
             self.raw_img = img
-            # check_img = img
-            # check_img = cv2.circle(check_img, (320, 240), 3, (255,0,0), 2)
-            # print(self.raw_img[320, 240])
-            # cv2.imshow("img", check_img)
-          
+            self.color_check = cv2.GaussianBlur(np.uint8([[self.raw_img[240, 320]]]), (5, 5), 0)
+            # self.color_check = cv2.cvtColor(self.color_check, cv2.COLOR_BGR2HSV)
+
+            check_img = img
+            check_img = cv2.circle(check_img, (320, 240), 3, (255,0,0), 2)
+            cv2.imshow("img", check_img)
+            # [120  98 189]
+            #191, 115, 116
+            #188 115 115
             pass
 
     def get_trackbar_pos(self):
@@ -354,14 +359,15 @@ class Docking:
             True/False (bool): 타겟을 찾음(True), 찾지 못함(False)
             target (list): 타겟을 찾았고, [넓이, 중앙지점] 정보를 담고 있음
         """
-        self.show_window()
-        preprocessed = mark_detect.preprocess_image(self.raw_img, blur=True)
+        # self.show_window()
+        preprocessed = mark_detect.preprocess_image(self.raw_img, blur=True , brightness=False, hsv=False)
 
         
         if self.target_color == 'black2':
           self.hsv_img = mark_detect.select_color(~preprocessed, self.color_range)  # 원하는 색만 필터링
         else:
             self.hsv_img = mark_detect.select_color(preprocessed, self.color_range)  # 원하는 색만 필터링
+
 
         
         #self.hsv_img = mark_detect.select_color(preprocessed, self.color_range)  # 원하는 색만 필터링
@@ -378,7 +384,35 @@ class Docking:
             return target
         else:
             return False if len(target) == 0 else True
+        
+    def check_target_state_zero(self, return_target=False):
+        """표지를 인식하고 타겟이면 타겟 정보를 반환
 
+        Args:
+            return_target (bool): target 정보를 리턴할 것인지(True), Bool 정보를 리턴할 것인지(False)
+
+        Returns:
+            True/False (bool): 타겟을 찾음(True), 찾지 못함(False)
+            target (list): 타겟을 찾았고, [넓이, 중앙지점] 정보를 담고 있음
+        """
+
+        preprocessed = mark_detect.preprocess_image(self.raw_img, blur=True , brightness=False, hsv=False)
+
+
+        self.hsv_img = preprocessed
+        target, self.shape_img, self.mark_area = mark_detect.detect_target_state_zero(
+            self.hsv_img,
+            self.target_shape,
+            self.mark_detect_area,
+            self.target_detect_area,
+            self.draw_contour,
+        )  # target = [area, center_col] 형태로 타겟의 정보를 받음
+        cv2.imshow("shape_img", self.shape_img)
+        if return_target == True:
+            return target
+        else:
+            return False if len(target) == 0 else True
+        
     def check_docked(self):
         """스테이션에 도크되었는지 확인
 
@@ -513,8 +547,16 @@ class Docking:
             print("Mark Area    : {:>7,.0f} / {:>7,.0f}".format(self.mark_area, self.mark_detect_area))
 
         print("")
-        print("Thruster  : {}".format(u_thruster))
+        print("ThrusterL  : {}".format(self.thruster_speed_L))
+        print("ThrusterR  : {}".format(self.thruster_speed_R))
+
         print("")
+        try:
+            print("color : {}".format(self.color_check))
+        except:
+            pass
+        print("\n\n\n\n")
+
         print("-" * 70)
 
     def show_window(self):
@@ -543,6 +585,7 @@ def main():
     docking.thruster_speed_L= 1500
     docking.thruster_speed_R= 1500
     start_straight = 0
+    imu_fix = True
     in_line = False
     #docking_state = 5
     while not docking.is_all_connected():
@@ -554,12 +597,13 @@ def main():
         docking.show_window()
         # print(docking.state)
         change_state = docking.check_state()  # 현재 상태 점검 및 변경
-        #docking.state = 5
         # 일부 변수 초기화
         inrange_obstacles = []
         danger_angles = []
         forward_point = []
-
+        if imu_fix:
+            docking.imu_fix = docking.psi_goal
+            imu_fix= False
         # 특정 지점으로 이동해야 하는 경우, psi_goal 계산
         if docking.state in [0]:
             docking.calc_psi_goal()
@@ -595,30 +639,30 @@ def main():
             )
             # 선속 결정
             u_thruster = True
-        elif docking.state == 3:
+
             docking.mark_check_cnt += 1  # 탐색 횟수 1회 증가
-            detected = docking.check_target()  # 타겟이 탐지 되었는가?
+            detected = docking.check_target_state_zero()  # 타겟이 탐지 되었는가?
 
-            if detected:
-                docking.detected_cnt += 1  # 타겟 탐지 횟수 1회 증가
+            # if detected:
+            #     docking.detected_cnt += 1  # 타겟 탐지 횟수 1회 증가
 
-            # 지정된 횟수만큼 탐색 실시해봄
-            if docking.mark_check_cnt >= docking.target_detect_time:
-                # 타겟 마크가 충분히 많이 검출됨
-                if docking.detected_cnt >= docking.target_detect_cnt:
-                    docking.target = docking.check_target(return_target=True)  # 타겟 정보
-                    docking.target_found = True  # 타겟 발견 플래그
-                else:
-                    docking.target = []  # 타겟 정보 초기화(못 찾음)
-                    docking.target_found = False  # 타겟 미발견 플래그
-                    rospy.sleep(0.2)
-                    docking.thrusterL_pub.publish(1550)
-                    docking.thrusterR_pub.publish(1550)
-                    rospy.sleep(1)
+            # # 지정된 횟수만큼 탐색 실시해봄
+            # if docking.mark_check_cnt >= docking.target_detect_time:
+            #     # 타겟 마크가 충분히 많이 검출됨
+            #     if docking.detected_cnt >= docking.target_detect_cnt:
+            #         docking.target = docking.check_target(return_target=True)  # 타겟 정보
+            #         docking.target_found = True  # 타겟 발견 플래그
+            #     else:
+            #         docking.target = []  # 타겟 정보 초기화(못 찾음)
+            #         docking.target_found = False  # 타겟 미발견 플래그
+            #         rospy.sleep(0.2)
+            #         docking.thrusterL_pub.publish(1550)
+            #         docking.thrusterR_pub.publish(1550)
+            #         rospy.sleep(1)
 
-            # 아직 충분히 탐색하기 전
-            else:
-                docking.target_found = False  # 타겟 미발견 플래그
+        #     # 아직 충분히 탐색하기 전
+        #     else:
+        #         docking.target_found = False  # 타겟 미발견 플래그
 
         # 헤딩 돌리기: 우선 일정 시간동안 정지한 후 헤딩 회전
         elif docking.state == 4:
@@ -632,26 +676,6 @@ def main():
                 docking.stop_cnt += 1  # 몇 번 루프를 돌 동안 정지
                 rospy.sleep(1)
                 u_thruster = False
-
-            # 에러각 계산 방식 (1)
-
-
-            # 에러각 계산 방식 (2) 선체의 헤딩값을 조절할 때 사용
-            # station_idx = docking.next_to_visit - 1
-            # projected_point = control.project_boat_to_station_vec(
-            #     stations=docking.waypoints,
-            #     station_vec_ends=docking.station_vec_ends,
-            #     station_idx=station_idx,
-            #     boat=[docking.boat_x, docking.boat_y],
-            # )
-            # error_angle, forward_point = control.follow_station_dir(
-            #     station_dir=docking.station_dir,
-            #     projection=projected_point,
-            #     boat=[docking.boat_x, docking.boat_y],
-            #     psi=docking.psi,
-            #     length=2,
-            # )
-            #error_angle = rearrange_angle(error_angle)
 
         # 표지 판단
         elif docking.state == 5:
@@ -683,21 +707,6 @@ def main():
             # 에러각 계산 방식 (1)
             error_angle = docking.station_dir - docking.psi
 
-            # 에러각 계산 방식 (2)
-            # station_idx = docking.next_to_visit - 1
-            # projected_point = control.project_boat_to_station_vec(
-            #     docking.waypoints,
-            #     docking.station_vec_ends,
-            #     station_idx,
-            #     [docking.boat_x, docking.boat_y],
-            # )
-            # error_angle, forward_point = control.follow_station_dir(
-            #     docking.station_dir,
-            #     projected_point,
-            #     [docking.boat_x, docking.boat_y],
-            #     docking.psi,
-            #     2,
-            # )
             error_angle = rearrange_angle(error_angle)
             u_thruster = False
 
@@ -706,31 +715,6 @@ def main():
             # 타겟 검출 for 도킹 완료 여부 판단 / 중앙 지점 추종
             docking.target = docking.check_target(return_target=True)
             u_thruster = True
-            # 도킹 Version1: 각 스테이션을 방문하는 것이 아닌, 중앙 멀리서 보았을 때 한 번에 도킹
-            # if len(docking.target) == 0:
-            #     station_idx = 3
-            # else:
-            #     if docking.target[1] < 215:
-            #         station_idx = 3
-            #     elif docking.target[1] > 420:
-            #         station_idx = 1
-            #     else:
-            #         station_idx = 2
-
-            # 도킹 Version2: 각 스테이션 보고 타겟이 있다면 직진 도킹
-            # station_idx = docking.next_to_visit - 1
-
-     
-            
-
-            # 에러각 계산 Version1: 타겟 마크의 중앙점이 프레임의 중앙으로 오도록 제어
-            # if len(docking.target) == 0:
-            #     error_angle = docking.station_dir - docking.psi
-            #     error_angle = rearrange_angle(error_angle)
-            # else:
-                # error_angle = control.pixel_to_degree(
-                #     docking.target, docking.pixel_alpha, docking.angle_range
-                # )  # 양수면 오른쪽으로 가야 함
 
             """
                 Version1
@@ -762,64 +746,18 @@ def main():
                     elif first_divisions > docking.target[2]:
                         #좌회전 선회
                         error_angle = -6.0
-                        print("좌회전")
                     elif last_divisions < docking.target[2]:
                         #우회전 선회
-                        print("우회전")
                         error_angle = 6.0
                     else:
                         #직진 들어왔다고 판단 직진 쓰러스트
                         error_angle = 0
-                        print("직진")
                         #직진
                 else:
                     pass
             except:
                 pass
-            """
-            try:
-                a, b = docking.hsv_img.shape
-                two_divisions = a / 2
 
-                if in_line == False:
-                    if two_divisions > docking.target[2]:
-                        #좌회전
-                        error_angle = -6.0
-                    elif two_divisions < docking.target[2]:
-                        #우회전
-                        error_angle = 6.0
-                    elif docking.target[2] == 0:
-                        if start_straight < docking.find_time:
-
-                            error_angle = docking.station_dir - docking.psi
-                            error_angle = rearrange_angle(error_angle)
-                        else:
-                            error_angle = 0
-                            u_thruster = True
-                            in_line = True
-                else:
-                    error_angle = 0
-                    #직진
-            except:
-                pass
-                
-            """
-
-
-            # 에러각 계산 Version2: 방향벡터로의 투영 & 추종점 설정
-            # projected_point = control.project_boat_to_station_vec(
-            #     docking.waypoints,
-            #     docking.station_vec_ends,
-            #     station_idx,
-            #     [docking.boat_x, docking.boat_y],
-            # )
-            # error_angle, forward_point = control.follow_station_dir(
-            #     docking.station_dir,
-            #     projected_point,
-            #     [docking.boat_x, docking.boat_y],
-            #     docking.psi,
-            #     2,
-            # )
             error_angle = rearrange_angle(error_angle)
         if u_thruster == True:
             # if error_angle>-0.9 and error_angle <-0.5: #go to light little
@@ -862,10 +800,6 @@ def main():
             angle_range=docking.angle_range,
             servo_range=docking.servo_range,
         )
-        # u_servo = int(moving_avg_filter(docking.filter_queue, docking.filter_queue_size, u_servo))
-
-        # docking.servo_pub.publish(u_servo)
-        # docking.thruster_pub.publish(u_thruster)
 
         # 터미널 프린트 주기 설정 및 현 상황 출력
         if print_cnt > 1:
@@ -1010,25 +944,20 @@ def docking_part():
                                 error_angle = docking.station_dir - docking.psi
                                 error_angle = rearrange_angle(error_angle)
                                 #앵글 각도 맞추기
-                                print(start_straight)
     
                             else:
-                                print("line진입 직진")
                                 error_angle = 0
                                 u_thruster = True
                                 in_line = True                    
                     elif first_divisions > docking.target[2]:
                         #좌회전 선회
                         error_angle = -6.0
-                        print("좌회전")
                     elif last_divisions < docking.target[2]:
                         #우회전 선회
-                        print("우회전")
                         error_angle = 6.0
                     else:
                         #직진 들어왔다고 판단 직진 쓰러스트
                         error_angle = 0
-                        print("직진")
                         #직진
                 else:
                     pass

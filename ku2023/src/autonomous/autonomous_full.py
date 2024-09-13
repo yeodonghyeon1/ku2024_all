@@ -340,7 +340,8 @@ def main():
 
                     #-------------------------------------------------------------------------#
 
-                    PID_distance = abs(math.log(pow(PID_distance, PID_distance_value), 2))
+                    PID_distance = int(abs(math.log(pow(PID_distance, PID_distance_value), 2)))
+                    PID_angle = int(PID_angle)
                     if error_angle < 0:
                         thruster_speed_L = thruster_speed_L + abs(PID_angle)
                         thruster_speed_R = thruster_speed_R - abs(PID_angle)
@@ -395,11 +396,11 @@ def main():
                     print("PID_angle", PID_angle)
                     print("PID_distance", PID_distance)
 
-                    print("thruster_speed_L", thruster_speed_L)
-                    print("thruster_speed_R", thruster_speed_R)
+                    print("thruster_speed_L", int(thruster_speed_L))
+                    print("thruster_speed_R", int(thruster_speed_R))
 
-                    auto.thrusterL_pub.publish(thruster_speed_L)
-                    auto.thrusterR_pub.publish(thruster_speed_R)
+                    auto.thrusterL_pub.publish(int(thruster_speed_L))
+                    auto.thrusterR_pub.publish(int(thruster_speed_R))
 
                     
 

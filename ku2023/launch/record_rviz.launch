@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <launch>
-	<arg name="filename" default="_2024-08-31-15-49-07.bag" /> 
+	<arg name="filename" default="_2024-09-12-16-43-43.bag" /> 
 	<node pkg="rosbag" type="play" name="rosbag_record" required="true" output="screen" args="/media/jetson/data/rosbag/$(arg filename)"  />
 	<node pkg="rviz" type="rviz" name="rviz_auto" args="-d $(find ku2023)/rviz/rviz_conf_auto.rviz" />
 </launch>
 
+
+<!--etk error _2024-09-12-15-31-18.bag-->
+<!-- fail to waypoint 2-->
+
+<!-- sucess _2024-09-12-16-43-43.bag-->

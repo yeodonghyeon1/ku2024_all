@@ -44,7 +44,7 @@ def mean_brightness(img):
     return dst
 
 
-def preprocess_image(raw_img, hsv=True, blur=False, brightness=False):
+def preprocess_image(raw_img, hsv=True, blur=False, brightness=False ): #, laplacian=False << pil yo hal dde
     """preprocess the raw input image
 
     brightness / gaussian blur / color space convert
@@ -59,14 +59,16 @@ def preprocess_image(raw_img, hsv=True, blur=False, brightness=False):
         np.ndarray: preprocessed image
     """
     img = raw_img
-    brightness=True
     if brightness == True:
         img = mean_brightness(img)
     if blur == True:
         img = cv2.GaussianBlur(img, (5, 5), 0)
     if hsv == True:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
+    # if laplacian:
+    #     img = cv2.Laplacian(img , cv2.CV_64F)
+    #     img = cv2.convertScaleAbs(img)
+    cv2.imshow("img", img)
     return img
 
 
@@ -103,7 +105,6 @@ def is_target(target_shape, target_detect_area, vertex_num, area):
     Retuns: 
         bool: True(타겟임) / False(타겟이 아니거나 기준에 못 미침)
     """
-    print("target_detect_area: " ,area)
 
     
     if (vertex_num == target_shape) and (area >= target_detect_area):
@@ -134,7 +135,121 @@ def is_target_fix(target_shape, target_detect):
         return True
     else:
         return False
+def detect_target_state_zero(img, target_shape, mark_detect_area, target_detect_area, draw_contour=True):
+    """detect all marks and get target information if target mark is there
 
+    1. 모폴로지 연산으로 빈 공간 완화 & 노이즈 제거
+    2. 도형 검출 및 근사
+    3. 넓이 작은 것은 제외
+    4. 변의 개수로 타겟 판단 및 시각화
+
+    Args:
+        img (np.ndarray): image only with target color
+        target_shape (int): number of sides of target shape. 3, 4, or over
+        draw_contour (bool): Whether to draw detected marks
+
+    Returns:
+        target (list): target detected information. [area of target (in pixel), location of target in the image (in pixel, only column)]
+        shape (numpy.ndarray): detection results
+        max_area (float): max area (if target is not detected, 0)
+
+    Note:
+        * approxPolyDP()의 반환인 approx의 구조 (삼각형일 때)
+            * type: numpy.ndarray
+            * shape: (3, 1, 2) -> 변 개수, 1, [행, 열] 정보이므로 요소 두 개
+            * 예: [[[105, 124]], [[107, 205]], [[226, 163]]]
+        * 때에 따라서는 같은 도형이 여러 개 발견될 수도 있음.
+            * 다른 모양의 도형이 프레임에서 잘린다든지, 다른 물체를 오인한다든지
+            * 일단 너비가 최대인 것을 따라가도록 설정
+    """
+    # 기본 변수 선언
+    detected = False  # 타겟을 발견했는가
+    max_area = 0  # 가장 넓은 넓이의 도형
+    target = []  # 타겟 정보 [area, center_col, approx]
+
+    # 모폴로지 연산
+    morph_kernel = np.ones((9, 9), np.uint8)
+    morph = cv2.morphologyEx(img, cv2.MORPH_CLOSE, morph_kernel)
+    #print(img)
+    # 시각화 결과 영상 생성
+    shape = cv2.cvtColor(morph, cv2.COLOR_BGR2GRAY)  # 시각화할 image
+    shaped = cv2.cvtColor(morph, cv2.COLOR_BGR2GRAY)  # 시각화할 image
+    # ret, imthres = cv2.threshold(shaped, 10, 1, cv2.THRESH_BINARY_INV)
+    # shaped = cv2.Canny(shaped, 50, 150)
+    cv2.drawContours(shaped, contour, -1, (0,255,0), 4)
+
+    cv2.imshow("sdfs", shaped)
+    # shape = cv2.GaussianBlur(shapes, (5,5) , 0)
+    # shape = cv2.Canny(blurred, 50, 150)
+    # shape = cv2.line(edges, (320, 0), (320, 480), (255, 0, 0), 2)  # 중앙 세로선
+  
+    # 화면 내 모든 도형 검출
+    contours, _ = cv2.findContours(shape, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    #contours,_ = cv2.findContours(morph, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+    #print("# conours {}".format(contours))
+    #print(contours)
+    # 각 도형의 타겟 여부 탐지
+    for contour in contours:
+        # 도형 근사
+        approx = cv2.approxPolyDP(contour, cv2.arcLength(contour, True) * 0.02, True)
+        # 도형 넓이
+        area = cv2.contourArea(approx)
+        if area < mark_detect_area:
+            continue  # 너무 작은 것은 제외
+        # print("area : {} / {} / {}".format(area, mark_detect_area, target_detect_area))
+        
+        
+        #cv2.imshow("baa", shapes)
+        # 변의 개수
+        vertex_num = len(approx)
+        # print("# of vertices : {}".format(vertex_num))
+        #corner = cv2.cornerHarris(shape, 2, 3, 0.04)
+        # 탐지 도형 구분
+        # 삼각형
+        if vertex_num == 3:
+            detected = is_target(target_shape, target_detect_area, vertex_num=3, area=area)
+        # 십자가
+        elif vertex_num == 12:
+            detected = is_target(target_shape, target_detect_area, vertex_num=12, area=area)
+        # 사각형
+        elif vertex_num == 4:
+            detected = is_target(target_shape, target_detect_area, vertex_num=4, area=area)
+        # 원
+        elif vertex_num == 8:
+            _, radius = cv2.minEnclosingCircle(approx)  # 원으로 근사
+            ratio = radius * radius * 3.14 / (area + 0.000001)  # 해당 넓이와 정원 간의 넓이 비
+            if 0.5 < ratio < 2:  # 원에 가까울 때만 필터링
+                detected = is_target(target_shape, target_detect_area, vertex_num=8, area=area)
+        else:
+            pass
+        # 탐지된 도형의 중앙 지점, 도형을 감싸는 사각형 꼭짓점 좌표
+        box_points, center_point = contour_points(approx)
+
+        # 타겟 정보 저장 (해당 화면에서 타겟이 검출되었다면)
+        if detected:
+            if area > max_area:  # 최대 크기라면 정보 갱신
+                target = [area, center_point[0], center_point[1]] #(edit) center_point[1] 추가
+                max_area = area
+            else:
+                detected = False  # 더 큰 마크가 있으므로 무시
+
+        # 현재 화면 검출 결과 시각화
+        shape = draw_mark(
+            window=shaped,
+            contour=approx,
+            vertices=vertex_num,
+            area=area,
+            box_points=box_points,
+            center_point=center_point,
+            is_target=detected,
+        )
+
+    # 타겟 검출 결과 반환
+    if max_area != 0:
+        return target, shape, max_area
+    else:  # 타겟이 검출되지 않음
+        return [], shape, max_area
+    
 
 def detect_target(img, target_shape, mark_detect_area, target_detect_area, draw_contour=True):
     """detect all marks and get target information if target mark is there
@@ -355,7 +470,6 @@ def test_with_img():
         cv2.imshow("col1", raw_img)
         shape_img = cv2.resize(hsv_img, (640, 480))
         col2 = cv2.resize(shape_img, dsize=(0, 0), fx=0.9, fy=1.0)
-        print("")
         #print(col1.shape)
         #print(col2.shape)
         show_img = np.hstack([col1, col2])
