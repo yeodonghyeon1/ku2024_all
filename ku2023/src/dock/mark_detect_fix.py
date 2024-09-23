@@ -24,7 +24,8 @@ import sys
 import time
 import cv2
 import numpy as np
-
+import imutils
+import random
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 
@@ -130,12 +131,10 @@ def is_target_fix(target_shape, target_detect):
     Retuns:
         bool: True(타겟임) / False(타겟이 아니거나 기준에 못 미침)
     """
-    if target_shape == target_detect:
-        # 모서리 개수가 일치하고, 넓이가 충분히 크면
-        return True
-    else:
-        return False
-def detect_target_state_zero(img, target_shape, mark_detect_area, target_detect_area, draw_contour=True):
+
+    return True
+
+def detect_target_state_zero_version2(search_all_maybe_image_board, img, mark_detect_area):
     """detect all marks and get target information if target mark is there
 
     1. 모폴로지 연산으로 빈 공간 완화 & 노이즈 제거
@@ -172,22 +171,12 @@ def detect_target_state_zero(img, target_shape, mark_detect_area, target_detect_
     morph = cv2.morphologyEx(img, cv2.MORPH_CLOSE, morph_kernel)
     #print(img)
     # 시각화 결과 영상 생성
-    shape = cv2.cvtColor(morph, cv2.COLOR_BGR2GRAY)  # 시각화할 image
-    shaped = cv2.cvtColor(morph, cv2.COLOR_BGR2GRAY)  # 시각화할 image
-    # ret, imthres = cv2.threshold(shaped, 10, 1, cv2.THRESH_BINARY_INV)
-    # shaped = cv2.Canny(shaped, 50, 150)
-    cv2.drawContours(shaped, contour, -1, (0,255,0), 4)
-
-    cv2.imshow("sdfs", shaped)
-    # shape = cv2.GaussianBlur(shapes, (5,5) , 0)
-    # shape = cv2.Canny(blurred, 50, 150)
-    # shape = cv2.line(edges, (320, 0), (320, 480), (255, 0, 0), 2)  # 중앙 세로선
+    shapes = cv2.cvtColor(morph, cv2.COLOR_GRAY2BGR)  # 시각화할 image
   
     # 화면 내 모든 도형 검출
-    contours, _ = cv2.findContours(shape, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     #contours,_ = cv2.findContours(morph, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
-    #print("# conours {}".format(contours))
-    #print(contours)
+
     # 각 도형의 타겟 여부 탐지
     for contour in contours:
         # 도형 근사
@@ -207,35 +196,35 @@ def detect_target_state_zero(img, target_shape, mark_detect_area, target_detect_
         # 탐지 도형 구분
         # 삼각형
         if vertex_num == 3:
-            detected = is_target(target_shape, target_detect_area, vertex_num=3, area=area)
+            detected = True
         # 십자가
         elif vertex_num == 12:
-            detected = is_target(target_shape, target_detect_area, vertex_num=12, area=area)
+            detected = True
         # 사각형
         elif vertex_num == 4:
-            detected = is_target(target_shape, target_detect_area, vertex_num=4, area=area)
+            detected = True
         # 원
         elif vertex_num == 8:
             _, radius = cv2.minEnclosingCircle(approx)  # 원으로 근사
             ratio = radius * radius * 3.14 / (area + 0.000001)  # 해당 넓이와 정원 간의 넓이 비
             if 0.5 < ratio < 2:  # 원에 가까울 때만 필터링
-                detected = is_target(target_shape, target_detect_area, vertex_num=8, area=area)
+                detected = True
         else:
-            pass
+            continue
         # 탐지된 도형의 중앙 지점, 도형을 감싸는 사각형 꼭짓점 좌표
         box_points, center_point = contour_points(approx)
 
         # 타겟 정보 저장 (해당 화면에서 타겟이 검출되었다면)
         if detected:
             if area > max_area:  # 최대 크기라면 정보 갱신
+                search_all_maybe_image_board.append([vertex_num, img[center_point[0], center_point[1]]])
                 target = [area, center_point[0], center_point[1]] #(edit) center_point[1] 추가
                 max_area = area
             else:
                 detected = False  # 더 큰 마크가 있으므로 무시
-
         # 현재 화면 검출 결과 시각화
         shape = draw_mark(
-            window=shaped,
+            window=shapes,
             contour=approx,
             vertices=vertex_num,
             area=area,
@@ -246,10 +235,138 @@ def detect_target_state_zero(img, target_shape, mark_detect_area, target_detect_
 
     # 타겟 검출 결과 반환
     if max_area != 0:
-        return target, shape, max_area
+        return target, shapes, max_area, search_all_maybe_image_board
     else:  # 타겟이 검출되지 않음
-        return [], shape, max_area
+        return [], shapes, max_area, search_all_maybe_image_board
+
+
     
+
+def detect_target_state_zero_version1(img_trajectory, search_all_maybe_image_board, img, target_shape, mark_detect_area, target_detect_area, draw_contour=True):
+    """detect all marks and get target information if target mark is there
+
+    1. 모폴로지 연산으로 빈 공간 완화 & 노이즈 제거
+    2. 도형 검출 및 근사
+    3. 넓이 작은 것은 제외
+    4. 변의 개수로 타겟 판단 및 시각화
+
+    Args:
+        img (np.ndarray): image only with target color
+        target_shape (int): number of sides of target shape. 3, 4, or over
+        draw_contour (bool): Whether to draw detected marks
+
+    Returns:
+        target (list): target detected information. [area of target (in pixel), location of target in the image (in pixel, only column)]
+        shape (numpy.ndarray): detection results
+        max_area (float): max area (if target is not detected, 0)
+
+    Note:
+        * approxPolyDP()의 반환인 approx의 구조 (삼각형일 때)
+            * type: numpy.ndarray
+            * shape: (3, 1, 2) -> 변 개수, 1, [행, 열] 정보이므로 요소 두 개
+            * 예: [[[105, 124]], [[107, 205]], [[226, 163]]]
+        * 때에 따라서는 같은 도형이 여러 개 발견될 수도 있음.
+            * 다른 모양의 도형이 프레임에서 잘린다든지, 다른 물체를 오인한다든지
+            * 일단 너비가 최대인 것을 따라가도록 설정
+    """
+    # 기본 변수 선언
+    detected = False  # 타겟을 발견했는가
+    max_area = 0  # 가장 넓은 넓이의 도형
+    target = []  # 타겟 정보 [area, center_col, approx]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    noise = random.randint(-20, 20)
+    thresh = cv2.threshold(blurred, -1, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    cv2.imshow("gray", thresh)
+
+    # 화면 내 모든 도형 검출
+    # contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours,_ = cv2.findContours(thresh, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+    c = 0
+    # 각 도형의 타겟 여부 탐지
+    for contour in contours:
+        # 도형 근사
+        approx = cv2.approxPolyDP(contour, cv2.arcLength(contour, True) * 0.02, True)
+        # 도형 넓이
+        mark_detect_area = 1000
+        max_mark_detect_area = 15000
+        area = cv2.contourArea(approx)
+        if area < mark_detect_area:
+            continue  # 너무 작은 것은 제외
+        # if area > max_mark_detect_area:
+        #     continue  # 너무 작은 것은 제외
+        # print("area : {} / {} / {}".format(area, mark_detect_area, target_detect_area))
+        # 변의 개수
+        vertex_num = len(approx)
+        # 탐지된 도형의 중앙 지점, 도형을 감싸는 사각형 꼭짓점 좌표
+        box_points, center_point = contour_points(approx)
+        # 탐지 도형 구분
+        # 삼각형
+        if vertex_num == 3:
+            detected = True
+        # 십자가
+        elif vertex_num == 12:
+            detected = True
+        # 사각형
+        elif vertex_num == 4:
+            detected = True
+        # 원
+        elif vertex_num == 8:
+            _, radius = cv2.minEnclosingCircle(approx)  # 원으로 근사
+            ratio = radius * radius * 3.14 / (area + 0.000001)  # 해당 넓이와 정원 간의 넓이 비
+            if 0.5 < ratio < 2:  # 원에 가까울 때만 필터링
+                detected = True
+        else:
+            detected = True
+            
+        # 타겟 정보 저장 (해당 화면에서 타겟이 검출되었다면)
+        if detected:
+            if len(img_trajectory) >= 300:
+                img_trajectory.pop()
+                img_trajectory.append([center_point, vertex_num])
+            else:
+                img_trajectory.append([center_point, vertex_num])
+            
+            not_we_want_shape = False
+            count = 0
+            for i in img_trajectory:
+                min_x = center_point[0] - 100
+                max_x = center_point[0] + 100
+                min_y = center_point[1] - 100
+                max_y = center_point[1] + 100
+                if i[0][0] > min_x and i[0][0] < max_x:
+                    if i[0][1] > min_y and i[0][1] < max_y:
+                        if i[1] != vertex_num:
+                            not_we_want_shape = True
+                            break
+            if not_we_want_shape == True:
+                continue
+            else:
+                search_all_maybe_image_board.append([vertex_num, img[center_point[0], center_point[1]]])
+                print(vertex_num, center_point)
+                if area > max_area:  # 최대 크기라면 정보 갱신
+                    target = [area, center_point[0], center_point[1]] #(edit) center_point[1] 추가
+                    max_area = area
+                else:
+                    detected = False  # 더 큰 마크가 있으므로 무시
+                    pass
+
+        # 현재 화면 검출 결과 시각화
+        shape = draw_mark(
+            window=thresh,
+            contour=approx,
+            vertices=vertex_num,
+            area=area,
+            box_points=box_points,
+            center_point=center_point,
+            is_target=detected,
+        )
+
+    # 타겟 검출 결과 반환
+    if max_area != 0:
+        return target, shape, max_area, img_trajectory,search_all_maybe_image_board
+    else:  # 타겟이 검출되지 않음
+        return [], shape, max_area, img_trajectory, search_all_maybe_image_board
 
 def detect_target(img, target_shape, mark_detect_area, target_detect_area, draw_contour=True):
     """detect all marks and get target information if target mark is there

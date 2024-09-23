@@ -93,7 +93,7 @@ class Docking:
         self.target_shape = rospy.get_param("target_shape")
         self.target_color = rospy.get_param("target_color")
         target_color_range = rospy.get_param("color_range")[self.target_color]
-
+        self.board_color_range = rospy.get_param("board_color_range")
         # ranges, limits
         self.angle_range = rospy.get_param("angle_range")  # 배열! [min, max]
         self.servo_range = rospy.get_param("servo_range")  # 배열! [min, max]
@@ -113,6 +113,22 @@ class Docking:
                 ],
             ]
         )
+        self.board_color_array = []
+        for i in self.board_color_range:
+            self.board_color_array.append(np.array(
+                [
+                    [
+                        self.board_color_range[i]["color1_lower"],
+                        self.board_color_range[i]["color2_lower"],
+                        self.board_color_range[i]["color3_lower"],
+                    ],
+                    [
+                        self.board_color_range[i]["color1_upper"],
+                        self.board_color_range[i]["color2_upper"],
+                        self.board_color_range[i]["color3_upper"],
+                    ],
+                ]
+            ))
         self.ref_dir_range = rospy.get_param("ref_dir_range")  # 좌우로 얼마나 각도 허용할 건가
         self.arrival_target_area = rospy.get_param("arrival_target_area")  # 도착이라 판단할 타겟 도형의 넓이
         self.mark_detect_area = rospy.get_param("mark_detect_area")  # 도형이 검출될 최소 넓이
@@ -136,7 +152,10 @@ class Docking:
         ]
         self.station_vec_ends = control.calc_station_vec_end(station_dir=self.station_dir, stations=self.waypoints[1:])
         self.trajectory = []
+        self.search_all_maybe_image_board = []
+        self.search_all_maybe_image_board_list = []
 
+        self.image_trajectory = []
         #self.diff = [-1.7, -0.4]
         # data
         self.psi = 0  # 자북과 선수 사이 각
@@ -144,6 +163,8 @@ class Docking:
         self.psi_desire = 0
         self.raw_img = np.zeros((480, 640, 3), dtype=np.uint8)  # row, col, channel
         self.hsv_img = np.zeros((480, 640), dtype=np.uint8)
+        self.hsv_img_list =[]
+
         self.shape_img = np.zeros((480, 640, 3), dtype=np.uint8)
         self.obstacles = []
         self.mark_area = 0
@@ -201,6 +222,15 @@ class Docking:
         self.target_found = False
         self.next_to_visit = 4  # 다음에 방문해야 할 스테이션 번호. state 시작을 1로할거면 1로
         self.imu_fix = 0
+
+
+        self.square = 0
+        self.triangle = 0
+        self.circle = 0
+        self.cross = 0
+        self.max_board_count = 0
+        self.use_the_board = False
+
         # controller
         cv2.namedWindow("controller")
         # cv2.createTrackbar("color1 min", "controller", self.color_range[0][0], 180, lambda x: x)
@@ -241,6 +271,7 @@ class Docking:
             check_img = img
             check_img = cv2.circle(check_img, (320, 240), 3, (255,0,0), 2)
             cv2.imshow("img", check_img)
+
             # [120  98 189]
             #191, 115, 116
             #188 115 115
@@ -301,12 +332,9 @@ class Docking:
             # 변경지점 도착 여부 판단1111
             change_state = self.calc_distance(self.waypoints[0])
         elif self.state == 3:
-            if self.mark_check_cnt >= self.target_detect_time:
+            result = (self.cross + self.circle + self.square + self.triangle)
+            if result >= 5000:
                 change_state = True
-                self.mark_check_cnt = 0
-                self.detected_cnt = 0
-            else:
-                change_state = False
         elif self.state == 4: # 도형 쪽으로 헤딩값 수정
             change_state = self.check_heading()
         elif self.state == 5:
@@ -385,7 +413,7 @@ class Docking:
         else:
             return False if len(target) == 0 else True
         
-    def check_target_state_zero(self, return_target=False):
+    def check_board(self, return_target=False):
         """표지를 인식하고 타겟이면 타겟 정보를 반환
 
         Args:
@@ -398,16 +426,66 @@ class Docking:
 
         preprocessed = mark_detect.preprocess_image(self.raw_img, blur=True , brightness=False, hsv=False)
 
-
         self.hsv_img = preprocessed
-        target, self.shape_img, self.mark_area = mark_detect.detect_target_state_zero(
-            self.hsv_img,
-            self.target_shape,
-            self.mark_detect_area,
-            self.target_detect_area,
-            self.draw_contour,
-        )  # target = [area, center_col] 형태로 타겟의 정보를 받음
-        cv2.imshow("shape_img", self.shape_img)
+
+        # version1 we use to gray scale and then contour image what is shape and color
+        # target, self.shape_img, self.mark_area, img_tj, search_all= mark_detect.detect_target_state_zero_version1(
+        #     self.image_trajectory,
+        #     self.search_all_maybe_image_board,
+        #     self.hsv_img,
+        #     self.target_shape,
+        #     self.mark_detect_area,
+        #     self.target_detect_area,
+        #     self.draw_contour,
+        # )  # target = [area, center_col] 형태로 타겟의 정보를 받음
+
+        # cv2.imshow("shape_img", self.shape_img)
+        # self.image_trajectory = img_tj
+        # self.search_all_maybe_image_board = search_all
+        # square = 0
+        # triangle = 0
+        # circle = 0
+        # for i in self.search_all_maybe_image_board:
+        #     if i[0] == 4:
+        #         square += 1
+        #     elif i[0] == 3:
+        #         triangle += 1
+        #     elif i[0] == 8:
+        #         circle += 1
+        # print("square: {}, triangle: {}, circle {}".format(square, triangle, circle))
+
+
+        #version2 we use to color_range so wo know that shape color before started autonomous
+        for i in self.board_color_array:
+            self.hsv_img_list.append(mark_detect.select_color(preprocessed, i))  # 원하는 색만 필터링
+        for j in self.hsv_img_list:
+            target, self.shape_img, self.mark_area, search_all = mark_detect.detect_target_state_zero_version2(
+                self.search_all_maybe_image_board,
+                j,
+                self.mark_detect_area,
+            )  # target = [area, center_col] 형태로 타겟의 정보를 받음
+            self.search_all_maybe_image_board = search_all
+            cv2.imshow("shape_img", self.shape_img)
+
+
+        temp_board_count = 0
+        for i in range(self.max_board_count+1, len(self.search_all_maybe_image_board)):
+            temp_board_count = i
+            if self.search_all_maybe_image_board[i][0] == 4:
+                self.square += 1
+            elif self.search_all_maybe_image_board[i][0] == 3:
+                self.triangle += 1
+            elif self.search_all_maybe_image_board[i][0] == 8:
+                self.circle += 1
+            elif self.search_all_maybe_image_board[i][0] == 12:
+                self.cross += 1
+
+
+        self.max_board_count = temp_board_count
+        self.hsv_img_list = []
+        if len(self.search_all_maybe_image_board) >= 100:
+            self.search_all_maybe_image_board = []
+            self.max_board_count = 0
         if return_target == True:
             return target
         else:
@@ -553,6 +631,8 @@ class Docking:
         print("")
         try:
             print("color : {}".format(self.color_check))
+            print("square: {}, triangle: {}, circle {},  cross {}".format(self.square, self.triangle, self.circle,  self.cross))
+
         except:
             pass
         print("\n\n\n\n")
@@ -640,29 +720,12 @@ def main():
             # 선속 결정
             u_thruster = True
 
-            docking.mark_check_cnt += 1  # 탐색 횟수 1회 증가
-            detected = docking.check_target_state_zero()  # 타겟이 탐지 되었는가?
-
-            # if detected:
-            #     docking.detected_cnt += 1  # 타겟 탐지 횟수 1회 증가
+        elif docking.state == 3:
+            detected = docking.check_board()  # 타겟이 탐지 되었는가?
+            docking.use_the_board = True
 
             # # 지정된 횟수만큼 탐색 실시해봄
-            # if docking.mark_check_cnt >= docking.target_detect_time:
-            #     # 타겟 마크가 충분히 많이 검출됨
-            #     if docking.detected_cnt >= docking.target_detect_cnt:
-            #         docking.target = docking.check_target(return_target=True)  # 타겟 정보
-            #         docking.target_found = True  # 타겟 발견 플래그
-            #     else:
-            #         docking.target = []  # 타겟 정보 초기화(못 찾음)
-            #         docking.target_found = False  # 타겟 미발견 플래그
-            #         rospy.sleep(0.2)
-            #         docking.thrusterL_pub.publish(1550)
-            #         docking.thrusterR_pub.publish(1550)
-            #         rospy.sleep(1)
 
-        #     # 아직 충분히 탐색하기 전
-        #     else:
-        #         docking.target_found = False  # 타겟 미발견 플래그
 
         # 헤딩 돌리기: 우선 일정 시간동안 정지한 후 헤딩 회전
         elif docking.state == 4:
@@ -706,7 +769,6 @@ def main():
 
             # 에러각 계산 방식 (1)
             error_angle = docking.station_dir - docking.psi
-
             error_angle = rearrange_angle(error_angle)
             u_thruster = False
 

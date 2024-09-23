@@ -44,12 +44,12 @@ station_dir: -10
 # 표지 색 범위
 color_range : {
   red: {
-    color1_lower: 88,
-    color1_upper: 108,
-    color2_lower: 92,
-    color2_upper: 112,
-    color3_lower: 178,
-    color3_upper: 188
+    color1_lower: 39,
+    color1_upper: 99,
+    color2_lower: 45,
+    color2_upper: 105,
+    color3_lower: 129,
+    color3_upper: 199
   },
   red_2: {
     color1_lower: 134,
@@ -101,15 +101,41 @@ color_range : {
     color3_lower: 0,
     color3_upper: 255
   }
-  
+}
 
+
+board_color_range : {
+  red: {
+    color1_lower: 39,
+    color1_upper: 99,
+    color2_lower: 45,
+    color2_upper: 105,
+    color3_lower: 129,
+    color3_upper: 199
+  },
+  brown: {
+    color1_lower: 41, 
+    color1_upper: 101,
+    color2_lower: 67,
+    color2_upper: 127, 
+    color3_lower: 120,
+    color3_upper: 180,
+  }, 
+  blue: {
+    color1_lower: 96,
+    color1_upper: 136,
+    color2_lower: 61,
+    color2_upper: 101,
+    color3_lower: 58,
+    color3_upper: 98
+  }
 }
 
 # 목표 모양 (3: triangle, 12: cross, 4: square 8: circle) # fix 0: circle, 1: square, 2: cross 3: triangle
-target_shape: 8
+target_shape: 4
 
 # 목표 색깔 (red, green, blue, black, black2, orange)
-target_color: blue
+target_color: red
 
 # 인식 최소 크기 (최소 이만큼은 되어야 인지 시작, 이보다 작으면 무시)
 mark_detect_area: 200
